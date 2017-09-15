@@ -1,0 +1,148 @@
+#####Example code for generating the average quality score for each basepair position#####
+
+#!/bin/python
+#SBATCH --job-name=Velveth      ### Job Name
+#SBATCH --time=0-24:00:00       ### Wall clock time limit in Days-HH:MM:SS
+#SBATCH --nodes=1               ### Node count required for the job
+#SBATCH --ntasks-per-node=28     ### Number of tasks to be launched per Node
+#SBATCH --partition=long        ### Partition (like a queue in PBS)
+
+
+mean_scores =[0.0] * 101 #Generating a list of 101 values of 0.0
+NR = 0 #Setting a line counter
+with open('/projects/bgmp/2017_sequencing/1294_S1_L008_R2_001.fastq') as fh:
+    for line in fh: #Looping through the file only looking at every fourth line
+        NR += 1
+        line = line.strip()
+        if NR % 4 == 0:
+            i = 0
+            for x in line: #Looping through each character in the desired line
+                score = (ord(x)-33) #Calculating the quality score for said character
+                mean_scores[i] += score #Adding that to our list
+                i += 1
+    j = 0
+    for x in mean_scores: #After that is done for every line, we divide by the number of lines to get average.
+	    mean_scores[j] = mean_scores[j] / (NR/4)
+	    j += 1
+with open ('test1.txt', 'w') as fh2:#Write that to a file so we can generate our plots.
+	for x in mean_scores:
+		fh2.write(str(x) + '\n')
+
+#####Example code for generating the frequency of quality scores that were denoted by each read#####		
+
+#!/bin/python
+#SBATCH --job-name=Velveth      ### Job Name
+#SBATCH --time=0-24:00:00       ### Wall clock time limit in Days-HH:MM:SS
+#SBATCH --nodes=1               ### Node count required for the job
+#SBATCH --ntasks-per-node=28     ### Number of tasks to be launched per Node
+#SBATCH --partition=short       ### Partition (like a queue in PBS)
+
+
+NR = 0 #Setting a line counter and empty dictionary
+testdict = {}
+with open('/projects/bgmp/2017_sequencing/1294_S1_L008_R4_001.fastq') as fh:
+    for line in fh:#Looping through the desired file 
+	readaverage = 0 #Setting our variables
+        totalreadaverage = 0
+        NR += 1 #Incrementing and stripping each line
+        line = line.strip()
+        if NR % 4 == 0: #Again only interested in quality scores in the fourth line
+            for x in line: #Looping through generating the quality score for each character
+                score = (ord(x)-33)
+                readaverage += score #Adding each quality score to a variable
+            totalreadaverage = (int(readaverage) / (len(line))) #Dividing the total quality score of each character by the length of the line
+            if totalreadaverage in testdict: #Setting a dictionary to increment frequencies.
+			    testdict[totalreadaverage] += 1
+	    else:
+			    testdict[totalreadaverage] = 1
+    with open('test23.txt', 'w') as fh2: #Writing all the key-value pairs from our dictionary to a file for analysis.
+		    for key in testdict:
+					fh2.write(str(key) + ':' + str(testdict[key]) + '\n')
+
+#### Index Swapping Code####
+					
+					
+#!/bin/python
+#SBATCH --job-name=Velveth      ### Job Name
+#SBATCH --time=0-24:00:00       ### Wall clock time limit in Days-HH:MM:SS
+#SBATCH --nodes=1              ### Node count required for the job
+#SBATCH --ntasks-per-node=28     ### Number of tasks to be launched per Node
+#SBATCH --partition=fat      ### Partition (like a queue in PBS)
+
+#Setting various variables, including a list and two dictionaries (one to hold index swapped reads, one to hold everything else)
+testlist = []
+#testlist2 = []
+testdict = {}
+testdict2 = {}
+indexes = []
+testdict['undetermined'] = 0 #Setting an undetermined key to 0 in my first dictionary.
+def Complement(index): #Function to find the complement of a string, taken from the internet.
+    #First we make our index into a list so we can modify it
+    index = list(index)
+    for each in range(len(index)):
+        #First we replace all the nucleotides to complements
+        if index[each]=='N':
+            index[each]='N'
+        elif index[each]=='A':
+            index[each]='T'
+        elif index[each]=='T':
+            index[each]='A'
+        elif index[each]=='C':
+            index[each]='G'
+        elif index[each]=='G':
+            index[each]='C'
+    #Now we return it to a string
+    index="".join(index)
+    #Then we inverse the order
+    index=index[::-1]
+    return index
+with open('justindexes.txt') as fh: #Looping through the indexes to generate our index pairs
+	for line in fh:
+		line = line.strip()
+		testlist.append(line)
+		#testlist2.append(line)
+for x in testlist:
+	indexes.append(x)
+		#testdict[x+y] = 0
+
+#Opening both files simulatenously and setting a counter, this time interested in the second line of each file.
+with open('/projects/bgmp/2017_sequencing/1294_S1_L008_R2_001.fastq') as fh2, open('/projects/bgmp/2017_sequencing/1294_S1_L008_R3_001.fastq') as fh3:
+	NR =0
+	for line2,line3 in zip(fh2,fh3):
+			NR += 1
+			if NR % 4 == 2:
+				#Stripping each line and setting each line to a variable, for the second file of indexes, using the aforementioned complement function to find the complement of that sequence.
+				line2 = line2.strip()
+				line3 = line3.strip()
+				test1 = line2
+				test2 = line3
+				test2 = Complement(test2)
+				print(test1)
+				print(test2)
+				#I then check to see if there is an N in either of the two lines we are looking at, if there is, we increment the undetermined key in our dictionary
+				if 'N' in test1 or 'N' in test2:
+					print('no')
+					testdict['undetermined'] += 1
+				#If the two lines are equal, either set a value in our first dictionary if it is not in there, or increment it.
+				elif test1 == test2:
+					print('yes')
+					if str(test1+"_"+test2) in testdict:
+						testdict[test1+"_"+test2]+=1
+					else:
+						testdict[test1+"_"+test2]=1
+				#Finally if the two lines do not match, either set a new key to 1 in our second dictionary (the one for index swapping) or increment that key)
+				elif test1 != test2:
+					print('maybe')
+					if str(test1+"_"+test2) in testdict2:
+						testdict2[test1+"_"+test2]+=1
+					else:
+						testdict2[test1+"_"+test2]=1
+					
+#Finally write the contents of each dictionary to a file so it can be analyzed.
+with open('FINALLYDONEWITHTHESUMMERTERM.TXT', 'w') as fh4:
+		    for key in testdict:
+					fh4.write(str(key) + ':' + str(testdict[key]) + '\n')
+with open('FINALLYDONEWITHTHESUMMERTERM2.TXT', 'w') as fh5:
+		    for key in testdict2:
+					fh5.write(str(key) + ':' + str(testdict2[key]) + '\n')
+		
